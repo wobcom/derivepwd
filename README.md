@@ -2,7 +2,7 @@
 
 derivepwd is a small CLI tool that derives passwords from a seed and a public component using a key derivation function.
 
-We use this tool to generate unique passwords for large fleets of devices.
+You can use this tool to generate unique passwords for large fleets of devices.
 
 ## Why?
 
@@ -14,7 +14,7 @@ Some of the requirements are:
 - Rotating the passwords is fast and easy (for example on offboardings)
 
 Interfacing with enterprise grade password managers is slow and painful.
-The tool tries to work around this problem by moving the per device part out of the password manager.
+This tool tries to work around this problem by moving the per device part out of the password manager.
 
 ## How?
 
@@ -35,9 +35,26 @@ We use the HKDF as a key derivation function, so **make sure to use high enough 
 ```
 
 The tool uses an alphanumeric character set that avoids similarly looking characters.
-The generated passwords are 16 characters long, with a character set of 32 characters. That results in 80 bits of entropy, which should be enough for use most cases.
+The generated passwords are 16 characters long, consisting of a set of 32 different characters.
+This results in 80 bits of entropy, which is long enough for sufficient security and short enough to make it easy to type into a VNC console.
 
 ## Usage
+
+```
+Usage: derivepwd [OPTIONS] <--seed <SEED>|--seed-file <SEED_FILE>> <HOSTNAME>
+
+Arguments:
+  <HOSTNAME>  hostname
+
+Options:
+  -s, --seed <SEED>            seed key as arugment
+      --seed-file <SEED_FILE>  seed key as file
+  -r, --role <ROLE>            role [default: root]
+  -h, --help                   Print help
+  -V, --version                Print version
+```
+
+### Example
 
 ```
 # get seed from enterprise password manager

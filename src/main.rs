@@ -1,12 +1,9 @@
 use clap::Parser;
-use std::fs;
 use data_encoding::Specification;
 use ring::digest::SHA256_OUTPUT_LEN;
-use ring::hkdf::Algorithm;
-use ring::hkdf::Okm;
-use ring::hkdf::Prk;
-use ring::hkdf::Salt;
-use ring::hkdf::HKDF_SHA256;
+use ring::hkdf::{Algorithm, Okm, Prk, Salt, HKDF_SHA256};
+use std::fs;
+use std::process::ExitCode;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -36,14 +33,22 @@ struct Seed {
     seed_file: Option<String>,
 }
 
-fn main() {
+fn main() -> ExitCode {
     let args = Args::parse();
     let seed_raw: String;
 
     if args.seed.seed.is_some() {
         seed_raw = args.seed.seed.unwrap();
     } else {
-        seed_raw = fs::read_to_string(args.seed.seed_file.unwrap()).expect("Unable to read seedfile");
+        seed_raw =
+            fs::read_to_string(args.seed.seed_file.unwrap()).expect("Unable to read seedfile");
+    }
+
+    // allowing `/` in hostnames could result in duplicate passwords
+    // Example: `example.com` w/ role `ipmi/root` and `example.com/ipmi` w/ role `root`
+    if args.hostname.contains("/") {
+        eprintln!("Slash is not allowed in hostname");
+        return ExitCode::from(1);
     }
 
     // Normalize inputs
@@ -56,20 +61,23 @@ fn main() {
     let context_data = &[hostname, b"/", role];
 
     println!("{}", derive_pwd(seed, context_data));
+    return ExitCode::from(0);
 }
 
 fn derive_pwd(seed: &[u8], context: &[&[u8]; 3]) -> String {
-
     // we use a static salt
     // doesn't help much, but eh, why not
     let salt = Salt::new(HKDF_SHA256, b"4pKYYXOtZZa56cJkOu8tlwVd7NrH5rz6");
 
     let pseudo_rand_key: Prk = salt.extract(seed);
-    let output_key_material: Okm<Algorithm> =
-        pseudo_rand_key.expand(context, HKDF_SHA256).expect("Failed to expand key material");
+    let output_key_material: Okm<Algorithm> = pseudo_rand_key
+        .expand(context, HKDF_SHA256)
+        .expect("Failed to expand key material");
 
     let mut result = [0u8; SHA256_OUTPUT_LEN];
-    output_key_material.fill(&mut result).expect("Failed to generate key");
+    output_key_material
+        .fill(&mut result)
+        .expect("Failed to generate key");
 
     encode_pwd(&result)
 }
@@ -82,7 +90,8 @@ fn encode_pwd(pwd_raw: &[u8]) -> String {
         // avoids special characters
         // avoids characters that look similar, like 0 and O or 1 and l
         spec.symbols.push_str("23456789abcdefghijklmnprstuvwxyz");
-        spec.encoding().expect("Failed to encode generated password")
+        spec.encoding()
+            .expect("Failed to encode generated password")
     };
 
     hex.encode(pwd_raw).split_at(16).0.to_string()

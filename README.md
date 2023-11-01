@@ -1,8 +1,9 @@
 # derivepwd
 
 derivepwd is a small CLI tool that derives passwords from a seed and a public component using a key derivation function.
+You can use this tool to derive unique passwords for large fleets of devices.
 
-You can use this tool to generate unique passwords for large fleets of devices.
+It is written in Rust, consists of less than 100 lines of code and uses the excellent [ring](https://github.com/briansmith/ring) crate for cryptographic operations.
 
 ## Why?
 
@@ -10,33 +11,41 @@ Sometimes there are situations where you can't use public key schemes for authen
 Some of the requirements are:
 
 - Have unique passwords per device
+- High entropy but still typable
 - Easy access to passwords when shit's on fire, yo
-- Rotating the passwords is fast and easy (for example on offboardings)
+- Rotating the passwords is fast and easy (for example on offboardings, compromise, etc.)
 
 Interfacing with enterprise grade password managers is slow and painful.
-This tool tries to work around this problem by moving the per device part out of the password manager.
+This tool tries to work around this problem by moving the per-device-part out of the password manager.
 
 ## How?
 
 We mix a secret seed with a public part and shove them through a key derivation function.
 The result is our password.
 
-We use the HKDF as a key derivation function, so **make sure to use high enough entropy seed**.
+We use HKDF as key derivation function. It's fast and not memory hard, so **make sure your seed has enough entropy**.
+
+The context is a concatenation from `hostname + "/" + role` and used for the info input of hkdf.
+The use of `/` in the hostname is not allowed, to prevent collisions.
 
 ```
-                                          seed key
-                                              │
-                                              ▼
-  hostname ──┐      ┌─────────┐        ┌────────────┐
-             ├──────► context ├───────►│    hkdf    ├─────►password
-      role ──┘      └─────────┘        └────────────┘
-
-
+                                        seed key
+                                            │
+                                            ▼
+  hostname ──┐     ┌────────┐ context ┌────────────┐
+             ├────►│ concat ├────────►│    hkdf    ├─────► password
+      role ──┘     └────────┘         └────────────┘
 ```
 
-The tool uses an alphanumeric character set that avoids similarly looking characters.
 The generated passwords are 16 characters long, consisting of a set of 32 different characters.
-This results in 80 bits of entropy, which is long enough for sufficient security and short enough to make it easy to type into a VNC console.
+To encode the passwords Derivepwd uses an alphanumeric character set that avoids similarly looking characters.
+This results in 80 bits of entropy that are easy enough to type in a laggy VNC console with the wrong keyboard layout.
+
+## Design Goals
+
+- Easy to use
+- Just one mode of operation
+- Secure by default
 
 ## Usage
 
@@ -57,7 +66,7 @@ Options:
 ### Example
 
 ```
-# get seed from enterprise password manager
+# fetch seed from enterprise password manager
 > SEED=$(op item get --vault network derivepwd-seed --fields password --format=json | jq -j .password)
 
 # derive password for device
@@ -65,3 +74,23 @@ Options:
 zvhz2zshzbwdv43k
 ```
 
+## Similar Projects
+
+- [gokey](https://github.com/cloudflare/gokey)
+
+
+## License
+
+Copyright 2023 Wobcom GmbH
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
